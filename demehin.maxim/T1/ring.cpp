@@ -1,47 +1,86 @@
 #include "ring.hpp"
 #include <stdexcept>
+#include <cmath>
 
-demehin::Ring::Ring(point_t center, double out_r, double in_r):
-  center_(center),
-  in_r_(in_r),
-  out_r_(out_r)
+namespace
 {
-  if (out_r <= in_r || out_r <= 0 || in_r <= 0)
+  double getPlgSide(const demehin::point_t* vrt)
   {
-    throw std::logic_error("incorrect shape");
+    double vector_x = vrt[1].x - vrt[0].x;
+    double vector_y = vrt[1].y - vrt[0].y;
+    return std::sqrt(vector_x * vector_x + vector_y * vector_y);
   }
+}
+
+demehin::Ring::Ring(size_t vrt_cnt1, const point_t* vrt1, size_t vrt_cnt2, const point_t* vrt2):
+  inner_plg_(nullptr),
+  outer_plg_(nullptr)
+{
+  double len1 = getPlgSide(vrt1);
+  double len2 = getPlgSide(vrt2);
+  if (len1 == len2 || vrt_cnt1 != 13 || vrt_cnt2 != 13)
+  {
+    throw std::logic_error("incorrect_shape");
+  }
+
+  try
+  {
+    if (len1 > len2)
+    {
+      inner_plg_ = new demehin::Polygon(vrt_cnt2, vrt2);
+      outer_plg_ = new demehin::Polygon(vrt_cnt1, vrt1);
+    }
+    else
+    {
+      inner_plg_ = new demehin::Polygon(vrt_cnt1, vrt1);
+      outer_plg_ = new demehin::Polygon(vrt_cnt2, vrt2);
+    }
+  }
+  catch (const std::bad_alloc& e)
+  {
+    delete inner_plg_;
+    delete outer_plg_;
+    throw;
+  }
+  catch (const std::logic_error& e)
+  {
+    delete inner_plg_;
+    delete outer_plg_;
+    throw;
+  }
+
+}
+
+demehin::Ring::~Ring()
+{
+  delete inner_plg_;
+  delete outer_plg_;
 }
 
 double demehin::Ring::getArea() const
 {
-  constexpr double PI = 3.1415;
-  return PI * (out_r_ * out_r_ - in_r_ * in_r_);
+  return outer_plg_->getArea() - inner_plg_->getArea();
 }
 
 demehin::rectangle_t demehin::Ring::getFrameRect() const
 {
-  double width = 2 * out_r_;
-  double height = 2 * out_r_;
-  rectangle_t fr_rect;
-  fr_rect.pos = center_;
-  fr_rect.width = width;
-  fr_rect.height = height;
-  return fr_rect;
+  return outer_plg_->getFrameRect();
 }
 
 void demehin::Ring::move(point_t s)
 {
-  center_ = s;
+  inner_plg_->move(s);
+  outer_plg_->move(s);
 }
 
 void demehin::Ring::move(double x, double y)
 {
-  center_.x += x;
-  center_.y += y;
+  inner_plg_->move(x, y);
+  outer_plg_->move(x, y);
 }
 
 void demehin::Ring::scale(double k)
 {
-  out_r_ *= k;
-  in_r_ *= k;
+  inner_plg_->scale(k);
+  outer_plg_->scale(k);
 }
